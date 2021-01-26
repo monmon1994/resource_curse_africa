@@ -1,0 +1,213 @@
+---
+title: "Natural Resource Curse EITI"
+author: "Monique Bennett"
+date: "26/01/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, include=FALSE}
+library(wbstats)
+library(tidyverse)
+library(democracyData)
+library(ggpubr)
+```
+
+## How does the resource curse work? 
+
+```{r data, include=FALSE}
+wgi_all <- download_wgi_voice_and_accountability()
+
+indicators <- c(gdp_pc = "NY.GDP.PCAP.CD",
+                gdp = "NY.GDP.MKTP.CD",
+                resource_rents = "NY.GDP.TOTL.RT.ZS",
+                fuel_exports =  "TX.VAL.FUEL.ZS.UN",
+                imports = 'NE.IMP.GNFS.CD',
+                exports = "NE.EXP.GNFS.CD","CC.EST", "GE.EST","RQ.EST", 
+                "PV.EST", "RL.EST", "VA.EST")
+
+africa_iso <- c("DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CV", "CMR", "CAF", "TCD", "COM", "COD",
+                "COG", "CIV", "DJI", "EGY", "ERI", "SWZ", "ETH", "GAB", "GMB", "GHA", "GIN", "GNB",
+                "KEN", "LSO", "LBR", "LBY", "MDG", "MWI", "MLI", "MRT", "MUS", "MAR", "MOZ", "NAM",
+                "NER", "NGA", "RWA", "STP", "SEN", "SYC", "SLE", "SOM", "ZAF", "SSD", "SDN", "TZA",
+                "TGO", "TUN", "UGA", "ZMB", "ZWE")
+
+wb <- wb_data(country = africa_iso, indicator = indicators, start_date = 2018, 
+              end_date = 2018, return_wide = TRUE)
+
+wgi_africa <- wgi_all %>% 
+  filter(wb_code %in% africa_iso, year == 2018)
+
+#allcountries <- read_csv("data/countryincomelist.csv")
+
+#developing <- subset(allcountries[, c("country_name", "iso3c", "region", 
+#                                      "income_class")], income_class != "High income")
+
+HDI <- readxl::read_excel("C:/Users/MoniqueBennett/OneDrive - GGA Good Governance Africa NPC/Documents/resource_curse_africa/data/HDI_data.xlsx")
+
+HDI$iso3c <- countrycode::countrycode(HDI$Country, origin = "country.name", destination = "iso3c")
+
+HDI_africa <- HDI %>% 
+  filter(iso3c %in% africa_iso)
+
+```
+
+```{r}
+#wb %>%
+ # select(country, CC.EST, GE.EST, exports, imports, gdp_pc, resource_rents, VA.EST) %>% 
+ # knitr::kable()
+
+summary(wb)
+```
+
+### Top 10 Resource Rents in Africa
+
+Total natural resources rents are the sum of oil rents, natural gas rents, coal rents (hard and soft), mineral rents, and forest rents.
+
+```{r}
+wb %>% 
+  select(country, resource_rents, GE.EST, VA.EST) %>% 
+  slice_max(resource_rents, n = 10) %>% 
+  knitr::kable()
+```
+
+### Bottom 10 Resource Rents in Africa
+
+```{r}
+wb %>% 
+  select(country, resource_rents, GE.EST, VA.EST) %>%
+  slice_min(resource_rents, n = 10) %>% 
+  knitr::kable()
+```
+
+### Top 10 Fuel export countries in Africa
+
+```{r}
+wb %>% 
+  select(country, fuel_exports, GE.EST, VA.EST) %>%
+  slice_max(fuel_exports, n = 10) %>% 
+  knitr::kable()
+```
+
+## Trade calculations
+
+```{r}
+wb$trade <- (wb$imports + wb$exports) / wb$gdp
+
+wb$trade_resources <- wb$fuel_exports / wb$imports
+```
+ 
+### Correlation 
+
+```{r}
+cor.test(wb$resource_rents, wb$gdp_pc, method=c("pearson", "kendall", "spearman"))
+
+cor.test(wb$resource_rents, wb$CC.EST, method=c("pearson", "kendall", "spearman"))
+
+cor.test(wb$resource_rents, wb$GE.EST, method=c("pearson", "kendall", "spearman"))
+
+cor.test(wb$fuel_exports, wb$resource_rents, method=c("pearson", "kendall", "spearman"))
+```
+
+### Correlation Plots
+
+Resource Rents vs GDPpc
+```{r warning=F}
+ggscatter(wb, x = "resource_rents", y = "gdp_pc", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10", yscale = "log10",
+          xlab = "Total natural resources rents (log)", ylab = "GDP per capita (log)")
+```
+
+Resource Rents vs Government Effectiveness
+```{r warning=F}
+ggscatter(wb, x = "resource_rents", y = "GE.EST", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10",
+          xlab = "Total natural resources rents", ylab = "Government Effectiveness WGI")
+```
+
+Resource Rents vs Control of Corruption
+```{r warning=F}
+ggscatter(wb, x = "resource_rents", y = "CC.EST", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10",
+          xlab = "Total natural resources rents", ylab = "Control of Corruption WGI")
+
+```
+
+Resource Rents vs Voice & Accountability
+```{r warning=F}
+ggscatter(wb, x = "resource_rents", y = "VA.EST", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10",
+          xlab = "Total natural resources rents", ylab = "Voice & Accountability WGI")
+```
+
+Trade of Resources vs Voice & Accountability
+```{r}
+ggscatter(wb, x = "trade_resources", y = "VA.EST", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Trade resources", ylab = "Voice & Accountability WGI")
+```
+
+Trade of Resources vs Control of Corruption 
+```{r}
+ggscatter(wb, x = "trade_resources", y = "CC.EST", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Trade resources", ylab = "Voice & Accountability WGI")
+```
+
+### Human Development Index and Resource Rents
+
+```{r}
+HDI_wb <- merge(wb, HDI, by.all = "ïso3c")
+```
+
+### Correlation 
+
+```{r}
+cor.test(HDI_wb$resource_rents, HDI_wb$HDI, method=c("pearson", "kendall", "spearman"))
+
+cor.test(HDI_wb$fuel_exports, HDI_wb$HDI, method=c("pearson", "kendall", "spearman"))
+
+cor.test(HDI_wb$trade, HDI_wb$HDI, method=c("pearson", "kendall", "spearman"))
+
+cor.test(HDI_wb$VA.EST, HDI_wb$HDI, method=c("pearson", "kendall", "spearman"))
+```
+### Correlation Plots
+
+Resource Rents vs HDI
+```{r warning=F}
+ggscatter(HDI_wb, x = "resource_rents", y = "HDI", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10",
+          xlab = "Total natural resources rents", ylab = "Human Development Index")
+```
+
+Fuel exports vs HDI
+```{r warning=F}
+ggscatter(HDI_wb, x = "fuel_exports", y = "HDI", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10",
+          xlab = "Fuel exports", ylab = "Human Development Index")
+```
+
+Trade resources vs HDI
+```{r warning=F}
+ggscatter(HDI_wb, x = "trade_resources", y = "HDI", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Trade resources", ylab = "Human Development Index")
+```
