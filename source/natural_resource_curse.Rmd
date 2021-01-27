@@ -14,6 +14,10 @@ library(wbstats)
 library(tidyverse)
 library(democracyData)
 library(ggpubr)
+library(ggrepel)
+library(extrafont)
+library(tikzDevice)
+loadfonts(device = "win", quiet = T)
 ```
 
 ## How does the resource curse work? 
@@ -52,6 +56,38 @@ HDI$iso3c <- countrycode::countrycode(HDI$Country, origin = "country.name", dest
 
 HDI_africa <- HDI %>% 
   filter(iso3c %in% africa_iso)
+
+## LIED
+
+lied <- readxl::read_excel("C:/Users/MoniqueBennett/OneDrive - GGA Good Governance Africa NPC/Documents/resource_curse_africa/data/lied_v5.2.xls")
+
+lied_2019 <- subset(lied[, c("countryn", "year", "lexical_index")], year == 2019)
+
+lied_2019$iso3c <- countrycode::countrycode(lied_2019$countryn, origin = "country.name", destination = "iso3c")
+
+lied_africa <- lied_2019 %>% 
+  filter(iso3c %in% africa_iso)
+
+lied_africa$dummy <- NA
+
+lied_africa$dummy[lied_africa$lexical_index == 0] <- 0
+
+lied_africa$dummy[lied_africa$lexical_index == 1] <- 0
+
+lied_africa$dummy[lied_africa$lexical_index == 2] <- 0
+
+lied_africa$dummy[lied_africa$lexical_index == 3] <- 0
+
+lied_africa$dummy[lied_africa$lexical_index == 6] <- 1
+
+lied_africa$dummy2 <- as.numeric(lied_africa$dummy)
+
+lied_africa$dummy2[lied_africa$dummy2 == 0] <- "Non-democratic"
+lied_africa$dummy2[lied_africa$dummy2 == 1] <- "Democratic"
+
+lied_africa$Regime <- as.factor(lied_africa$dummy2)
+
+wb <- merge(wb, lied_africa, by = 'iso3c')
 
 ```
 
@@ -116,11 +152,32 @@ cor.test(wb$fuel_exports, wb$resource_rents, method=c("pearson", "kendall", "spe
 
 Resource Rents vs GDPpc
 ```{r warning=F}
+countries2 <-  c('Angola', "Botswana", 'Comoros', "Congo, Dem. Rep.", 'Eswatini', 'Lesotho', 'Madagascar', 'Malawi', 'Mauritius', 'Mozambique', 'Namibia', 'Seychelles', 'South Africa', 'Tanzania', 'Zambia', 'Zimbabwe')
+
+countries <- wb %>% 
+  filter(country %in% countries2) %>% 
+  select(country, resource_rents, CC.EST, gdp_pc, VA.EST)
+
+
 ggscatter(wb, x = "resource_rents", y = "gdp_pc", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xscale = "log10", yscale = "log10",
-          xlab = "Total natural resources rents (log)", ylab = "GDP per capita (log)")
+          add = "reg.line", conf.int = TRUE, palette = "jco",
+          cor.method = "pearson", cor.coef = T, cor.coef.coord = c(-2.7, 2.5),
+          shape = "Regime",
+          xscale = "log10", yscale = "log10", 
+          font.family = "Proxima Nova Rg",
+          label.select = countries2, label = "country", repel = T,
+          title = "What does wealth in resources mean for economic prosperity in Africa?",
+          xlab = "Total natural resources rents (log scale)", ylab = "GDP per capita (log scale)") +
+  scale_shape_manual(values = c(19, 1)) +
+  labs(caption = '*Total natural resources rents are the sum of oil, natural gas, coal, mineral and forest rents.
+Source: World Bank Development Indicators and Lexical Index of Electoral Democracy 26 January 2020. 
+Graphic: Monique Bennett at Good Governance Africa',
+subtitle = "Latest data on total natural resource rents and its relationship with GDP per capita remains negative.") +
+  theme(plot.caption = element_text(hjust = 0, size = 9), plot.caption.position = "plot", plot.subtitle = element_text(size = 9),
+        plot.title = element_text(face = "bold", size = 12), legend.position = "bottom",
+          legend.box = "vertical")
+
+ggsave("resource_rents_gdppc.png")
 ```
 
 Resource Rents vs Government Effectiveness
@@ -134,12 +191,36 @@ ggscatter(wb, x = "resource_rents", y = "GE.EST",
 
 Resource Rents vs Control of Corruption
 ```{r warning=F}
-ggscatter(wb, x = "resource_rents", y = "CC.EST", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xscale = "log10",
-          xlab = "Total natural resources rents", ylab = "Control of Corruption WGI")
+options(ggrepel.max.overlaps = Inf)
 
+ggscatter(wb, x = "resource_rents", y = "CC.EST", 
+          add = "reg.line", 
+          conf.int = TRUE, 
+          palette = "jco",
+          cor.method = "pearson", cor.coef = T, cor.coef.coord = c(-2.7, -2.4),
+          shape = "Regime",
+          xscale = "log10", 
+          font.family = "Proxima Nova Rg",
+          #label.select = countries2, label = "country", repel = T,
+          title = "Poor control over corruption is high among African states with high resource rents.",
+          xlab = "Total natural resources rents (log scale)", ylab = "Control of Corruption") +
+  scale_shape_manual(values = c(19, 1)) +
+  labs(caption = '*Control of corruption captures perceptions of the extent to which public power is exercised for private gain, 
+including both petty and grand forms of corruption, as well as "capture" of the state by elites and private interests.
+Source: World Bank Development & Governance Indicators and Lexical Index of Electoral Democracy 26 January 2020. 
+Graphic: Monique Bennett at Good Governance Africa',
+subtitle = "African countries with poor corruption scores (less than 1) have higher resource rents, which suggests 
+a negative relationship. Regime type is shown using point shape.") +
+  geom_text_repel(data = countries, aes(resource_rents, CC.EST, label = country), size = 4, color = "black", force = 4,
+                  box.padding = 0.5) +
+  theme(plot.caption = element_text(hjust = 0, size = 10), plot.caption.position = "plot", 
+        plot.subtitle = element_text(size = 10),
+        plot.title = element_text(face = "bold", size = 12), legend.position = "bottom",
+          legend.box = "vertical") +
+  expand_limits(y = c(-2.5, 2.5)) 
+
+
+ggsave("corruption_resource_rents.png", width = 8, height = 8)
 ```
 
 Resource Rents vs Voice & Accountability
@@ -189,10 +270,24 @@ cor.test(HDI_wb$VA.EST, HDI_wb$HDI, method=c("pearson", "kendall", "spearman"))
 Resource Rents vs HDI
 ```{r warning=F}
 ggscatter(HDI_wb, x = "resource_rents", y = "HDI", 
-          add = "reg.line", conf.int = TRUE, 
+          add = "reg.line", conf.int = TRUE, palette = "jco",
           cor.coef = TRUE, cor.method = "pearson",
-          xscale = "log10",
-          xlab = "Total natural resources rents", ylab = "Human Development Index")
+          shape = "Regime",
+          xscale = "log10", yscale = "log10", 
+          font.family = "Proxima Nova Rg",
+          label = "country", repel = T,
+          title = "What does wealth in resources mean for human development in Africa?",
+          xlab = "Total natural resources rents (log scale)",  ylab = "Human Development Index") +
+  scale_shape_manual(values = c(19, 1)) +
+  labs(caption = '*Total natural resources rents are the sum of oil, natural gas, coal, mineral and forest rents.
+Source: World Bank Development Indicators and Human Development Index 26 January 2020. 
+Graphic: Monique Bennett at Good Governance Africa',
+subtitle = "Latest data on total natural resource rents and its relationship with human development is negative.") +
+  theme(plot.caption = element_text(hjust = 0, size = 8), plot.caption.position = "plot", plot.subtitle = element_text(size = 9),
+        plot.title = element_text(face = "bold", size = 11), legend.position = "bottom",
+          legend.box = "vertical")
+
+ggsave("humandevelopment_resourcerents.png")
 ```
 
 Fuel exports vs HDI

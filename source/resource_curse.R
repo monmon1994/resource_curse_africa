@@ -2,6 +2,7 @@ library(wbstats)
 library(tidyverse)
 library(democracyData)
 library(ggpubr)
+library()
 
 ## How does the resource curse work? ##
 ## Need variables for resource dependence and governance quality and development
@@ -58,7 +59,7 @@ wb$trade_resources <- wb$fuel_exports / wb$imports
 
 ### Correlation 
 
-cor.test(wb$resource_rents, wb$gdp_pc, method=c("pearson", "kendall", "spearman"))
+cor.test(log(wb$resource_rents), log(wb$gdp_pc), method="pearson")
 
 cor.test(wb$resource_rents, wb$CC.EST, method=c("pearson", "kendall", "spearman"))
 
@@ -83,5 +84,21 @@ ggscatter(wb, x = "resource_rents", y = "CC.EST",
           cor.coef = TRUE, cor.method = "pearson",
           xlab = "Total natural resources rents", ylab = "Control of Corruption WGI")
 
+#####
+
+countries <- wb %>% 
+  slice_max(resource_rents, n = 15) %>% 
+  select(country) %>% 
+  pull(country)
+
+countries2 <- c("Congo, Rep.","Libya", "Angola","Congo, Dem. Rep.","Chad","Gabon","Sudan","Liberia","Zambia","Algeria","Mauritania",
+                "Mozambique","Guinea","Burkina Faso","Ghana", "South Africa")
+
+ggscatter(wb, x = "resource_rents", y = "gdp_pc", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xscale = "log10", yscale = "log10",
+          xlab = "Total natural resources rents (log)", ylab = "GDP per capita (log)", label = "country",
+          label.select = countries2, repel = T)
 
 
