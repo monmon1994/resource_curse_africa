@@ -102,3 +102,5 @@ ggscatter(wb, x = "resource_rents", y = "gdp_pc",
           label.select = countries2, repel = T)
 
 
+
+
